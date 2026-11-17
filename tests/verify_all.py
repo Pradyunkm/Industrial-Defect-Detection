@@ -130,7 +130,13 @@ def dashboard_check():
 
 def main():
     print("=== COMPLETE RASPBERRY PI VERIFICATION ===", flush=True)
-    safe_power = power_check("Power before inference")
+    skip_power = "--skip-power" in sys.argv
+    if skip_power:
+        print("Power checks deliberately excluded (--skip-power).", flush=True)
+        print("CAUTION: Combined inference still runs once; use a stable power source.", flush=True)
+        safe_power = True
+    else:
+        safe_power = power_check("Power before inference")
     result = run(["git", "status", "--porcelain"], capture_output=True, text=True)
     record("Git working tree clean", result.returncode == 0 and not result.stdout.strip(),
            result.stdout.strip() or "clean")
@@ -193,7 +199,8 @@ def main():
 
     print("\n=== STREAMLIT SERVER ===", flush=True)
     dashboard_check()
-    power_check("Power after inference")
+    if not skip_power:
+        power_check("Power after inference")
     passed = sum(ok for _, ok in checks)
     print(f"\n=== RESULTS: {passed}/{len(checks)} CHECKS PASSED ===", flush=True)
     print("Manual browser check still needed: upload JPG, explain with Llama, "
