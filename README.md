@@ -9,7 +9,7 @@ An **offline-capable steel-surface inspection research prototype** running on a 
 ## System architecture
 
 ```text
-Uploaded steel image
+Uploaded steel image OR Pi-connected USB / network camera frame
     |
     v
 YOLOv8 Nano / NCNN (Raspberry Pi CPU)
@@ -30,7 +30,7 @@ Streamlit dashboard
     +--> Inspection history and CSV export
 ```
 
-Llama receives a **text summary of YOLO detections**, not the image pixels. It is invoked by the user, not on every camera frame. The Raspberry Pi dashboard supports **image uploads**; the separate Windows development application contains live-camera functionality and is not included in this repository.
+Llama receives a **text summary of YOLO detections**, not the image pixels. It is invoked on demand, not on every camera frame. The Raspberry Pi dashboard supports **image uploads**, optional **Pi-side USB/RTSP live video inspection**, and browser-camera **still-photo capture**. The separate Windows development application's camera code is unchanged and not included here. **Pi live-camera operation has not yet been hardware-verified.**
 
 ## Detected defect classes
 
@@ -62,7 +62,7 @@ A stable power source is important for repeatable inference. Development with la
 
 ```text
 src/
-  dashboard/app_pi.py       Streamlit upload and inspection-history UI
+  dashboard/app_pi.py       Streamlit upload, experimental Pi live-feed, and history UI
   inference/common.py       YOLO inference and demo review rules
   inference/infer_image.py  Single-image command-line inference
   inference/llama_explain.py  Optional offline Llama explanation helper
@@ -106,7 +106,15 @@ python -m streamlit run src/dashboard/app_pi.py \
 
 From a computer on the same local network, open `http://<raspberry-pi-ip>:8501`.
 
-In the **Upload image** tab, upload a steel-surface JPG or PNG, review the YOLO detections, optionally choose **Explain with Llama (offline)**, and download the annotated PNG or save the inspection to SQLite. The **Inspection history** tab displays saved records and supports CSV export.
+In the **Upload image** tab, upload a steel-surface JPG or PNG (or capture a **single still photo** using the browser camera), review YOLO detections, optionally choose **Explain with Llama (offline)**, then download the annotated PNG or save the inspection to SQLite. The **Inspection history** tab displays saved records and supports CSV export.
+
+### Experimental live camera with automatic annotations
+
+Open the **Live camera** tab, select **USB camera connected to Raspberry Pi** (camera index 0 by default) or **RTSP / HTTP network camera**, then click **Start live detection**. If a compatible camera is available to the Pi, the page periodically shows camera frames with YOLO bounding boxes, defect labels, confidence scores and a demonstration review category. Use the sidebar **Show YOLO bounding-box annotations** checkbox to toggle visual overlays for upload and live images.
+
+Click **Stop and review latest frame** to freeze the last successfully analyzed frame. You can then download its annotated PNG, request optional offline Llama guidance, or save the snapshot and detection metadata into SQLite.
+
+**Important:** Video capture happens on the **Raspberry Pi server**, not inside the remote browser. A Windows laptop's built-in camera is **not automatically usable as the live feed** through a remote HTTP Streamlit page. Browser still-photo capture may require HTTPS or localhost for permission. Continuous YOLO annotation is **CPU-limited and may update every few seconds**, not at video frame rate; use a stable dedicated Pi 5 power supply before extended testing. No USB camera, RTSP source or Windows browser webcam live-feed has yet been verified in this project.
 
 The local database is `database/inspections.db`; annotated saved outputs are under `logs/annotated/`. These are runtime artifacts and are not committed.
 
@@ -133,8 +141,9 @@ The command writes an annotated PNG and a JSON report containing detected region
 - **8/8 lightweight automated tests passing**, covering YOLO review rules and mocked Llama response handling
 - Combined YOLO → Llama explanations inside the Streamlit dashboard
 - SQLite inspection saving, annotated-file persistence, and CSV generation/download
+- Live-camera UI code added for Pi-side USB/RTSP input; **hardware test pending**
 
-**Still to verify:** the full dashboard workflow under network isolation, systematic evaluation across the six defect classes, and repeatable performance under a stable dedicated power supply. No overall accuracy or real-time camera-performance claim is made here.
+**Still to verify:** the new live-camera UI with a physical camera source, the full dashboard workflow under network isolation, systematic evaluation across the six defect classes, and repeatable performance under a stable dedicated power supply. No overall accuracy or real-time camera-performance claim is made here.
 
 ### Run the lightweight logic tests
 
@@ -151,8 +160,8 @@ These tests do not load model weights, access the internet, or require an attach
 - YOLO bounding boxes and confidences are **not** real-world dimensions, defect causes, or calibrated severity.
 - Llama can generate incomplete or unsupported advice. The prototype uses a limited output filter and a class-specific rule-based fallback, but neither guarantees factual correctness.
 - Human inspection and approved site-specific criteria must determine any production QC disposition.
-- The uploaded-image Pi dashboard does not provide a tested live-camera pipeline; any separate Windows camera implementation must be evaluated independently.
+- The Pi dashboard now has an **experimental** live-camera tab for Pi-connected USB/RTSP sources. Live-camera hardware operation has not yet been tested, and any separate Windows camera implementation must be evaluated independently.
 
 ## Next work
 
-Expand evaluation results and reproducibility instructions, test the **complete dashboard/browser workflow** under network isolation, and prepare architecture screenshots and a demonstration video for the challenge submission.
+Verify the **new live-camera tab with compatible camera hardware**, expand quantitative defect-class evaluation, test the complete dashboard/browser workflow, and prepare architecture screenshots and a demonstration video for the challenge submission.
