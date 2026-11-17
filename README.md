@@ -62,7 +62,9 @@ A stable power source is important for repeatable inference. Development with la
 
 ```text
 src/
-  dashboard/app_pi.py       Streamlit upload, experimental Pi live-feed, and history UI
+  dashboard/app_pi.py       Streamlit upload, multiple live feeds and inspection history
+  dashboard/camera_sources.py  USB/V4L2, Pi CSI, and RTSP/HTTP backends
+  dashboard/browser_live.py  Optional browser webcam over WebRTC
   inference/common.py       YOLO inference and demo review rules
   inference/infer_image.py  Single-image command-line inference
   inference/llama_explain.py  Optional offline Llama explanation helper
@@ -110,11 +112,35 @@ In the **Upload image** tab, upload a steel-surface JPG or PNG (or capture a **s
 
 ### Experimental live camera with automatic annotations
 
-Open the **Live camera** tab, select **USB camera connected to Raspberry Pi** (camera index 0 by default) or **RTSP / HTTP network camera**, then click **Start live detection**. If a compatible camera is available to the Pi, the page periodically shows camera frames with YOLO bounding boxes, defect labels, confidence scores and a demonstration review category. Use the sidebar **Show YOLO bounding-box annotations** checkbox to toggle visual overlays for upload and live images.
+Open the **Live camera** tab and choose one of four sources:
+
+1. **USB webcam on Raspberry Pi** — V4L2 / OpenCV, choose index 0, 1, etc.; useful for a USB webcam or HDMI USB capture dongle connected to the Pi
+2. **Raspberry Pi Camera Module (CSI)** — official or compatible ribbon-cable camera on the Pi 5 CAM0/CAM1 connector; uses `Picamera2` if importable from the app Python, otherwise tries the system `rpicam-still` capture command (slower, periodic still images)
+3. **RTSP / HTTP network camera** — an IP camera with an OpenCV-readable stream URL
+4. **Browser webcam (Windows or phone) — WebRTC** — optional `streamlit-webrtc`/PyAV installation; reads the camera of the device displaying the dashboard and runs inference on the Pi
+
+For Pi-side USB, CSI or network cameras, click **Start live detection**. If the selected source is available, the page periodically shows camera frames with YOLO bounding boxes, defect labels, confidence scores and a demonstration review category. Use **Show YOLO bounding-box annotations** in the sidebar to toggle the overlay. The **Detect attached Pi cameras** button lists Linux V4L2 devices and uses `rpicam-hello --list-cameras` when available.
 
 Click **Stop and review latest frame** to freeze the last successfully analyzed frame. You can then download its annotated PNG, request optional offline Llama guidance, or save the snapshot and detection metadata into SQLite.
 
-**Important:** Video capture happens on the **Raspberry Pi server**, not inside the remote browser. A Windows laptop's built-in camera is **not automatically usable as the live feed** through a remote HTTP Streamlit page. Browser still-photo capture may require HTTPS or localhost for permission. Continuous YOLO annotation is **CPU-limited and may update every few seconds**, not at video frame rate; use a stable dedicated Pi 5 power supply before extended testing. No USB camera, RTSP source or Windows browser webcam live-feed has yet been verified in this project.
+**Camera placement and browser security:** USB, CSI and IP video sources are opened by the **Raspberry Pi server**. A Windows laptop's built-in camera does not appear as a Pi USB camera. To use it, choose **Browser webcam — WebRTC**; this requires the optional `streamlit-webrtc` package (and its PyAV dependency) in the Pi app environment:
+
+```bash
+# Optional only; do not install if you only need Pi-side USB/CSI/IP cameras
+python -m pip install streamlit-webrtc
+```
+
+Browser media permissions require a **secure context** (HTTPS or `localhost`). For local Windows development, use an SSH local port-forward in Windows PowerShell:
+
+```powershell
+ssh -L 8502:127.0.0.1:8501 pi@pi.local
+```
+
+Keep the SSH tunnel open, and visit `http://localhost:8502` **in the Windows browser**. This can enable camera permission on the laptop without exposing the Pi app to the public internet. WebRTC's peer connection may still require network setup; this prototype requests local ICE candidates only and does not use a public STUN/TURN server. Alternatively, the **Upload image** tab's browser still-photo option supports a single frame.
+
+Camera Module drivers and `rpicam-*` tools are **system packages**; consult the [official Raspberry Pi camera software guide](https://www.raspberrypi.com/documentation/accessories/camera-software.html) for compatible installation. On systems where Picamera2 is installed only into the system Python, the app's virtual environment might not import it; the `rpicam-still` fallback can work without modifying the virtual environment.
+
+**Performance/testing:** Continuous YOLO annotation is CPU-limited and updates periodically, not at 30 FPS. The optional browser webcam also throttles inference to reduce load. Use a stable dedicated Pi 5 supply before extended testing. **No USB, CSI, IP or browser live camera hardware has been verified yet in this project; the added paths are experimental.**
 
 The local database is `database/inspections.db`; annotated saved outputs are under `logs/annotated/`. These are runtime artifacts and are not committed.
 
@@ -141,9 +167,9 @@ The command writes an annotated PNG and a JSON report containing detected region
 - **8/8 lightweight automated tests passing**, covering YOLO review rules and mocked Llama response handling
 - Combined YOLO → Llama explanations inside the Streamlit dashboard
 - SQLite inspection saving, annotated-file persistence, and CSV generation/download
-- Live-camera UI code added for Pi-side USB/RTSP input; **hardware test pending**
+- Multi-source live-camera UI code added for USB, CSI, IP and optional browser WebRTC; **hardware test pending**
 
-**Still to verify:** the new live-camera UI with a physical camera source, the full dashboard workflow under network isolation, systematic evaluation across the six defect classes, and repeatable performance under a stable dedicated power supply. No overall accuracy or real-time camera-performance claim is made here.
+**Still to verify:** the new multi-source live-camera UI with real USB, CSI, IP or browser camera hardware, the full dashboard workflow under network isolation, systematic evaluation across the six defect classes, and repeatable performance under a stable dedicated power supply. No overall accuracy or real-time camera-performance claim is made here.
 
 ### Run the lightweight logic tests
 
@@ -160,7 +186,7 @@ These tests do not load model weights, access the internet, or require an attach
 - YOLO bounding boxes and confidences are **not** real-world dimensions, defect causes, or calibrated severity.
 - Llama can generate incomplete or unsupported advice. The prototype uses a limited output filter and a class-specific rule-based fallback, but neither guarantees factual correctness.
 - Human inspection and approved site-specific criteria must determine any production QC disposition.
-- The Pi dashboard now has an **experimental** live-camera tab for Pi-connected USB/RTSP sources. Live-camera hardware operation has not yet been tested, and any separate Windows camera implementation must be evaluated independently.
+- The Pi dashboard now has an **experimental** live-camera tab for Pi-connected USB, CSI and IP sources plus optional browser WebRTC. Live-camera hardware operation has not yet been tested, and any separate Windows camera implementation must be evaluated independently.
 
 ## Next work
 
