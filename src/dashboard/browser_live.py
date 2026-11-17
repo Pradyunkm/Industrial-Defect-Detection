@@ -16,6 +16,7 @@ import streamlit as st
 
 from common import predict, review
 from llama_explain import explain_defects
+from inspection_store import save_inspection
 
 
 def render_browser_live(model, conf, imgsz, show_annotations, db_path, output_dir, model_path, fallback_guidance):
@@ -169,24 +170,14 @@ def render_browser_live(model, conf, imgsz, show_annotations, db_path, output_di
             st.caption("Advisory only. Human verification required.")
 
         if st.button("💾 Save browser webcam frame to SQLite", key="pi_browser_save"):
-            record_id = uuid.uuid4().hex[:12]
-            output_path = output_dir / (record_id + ".png")
-            output_path.write_bytes(last["annotated_png"])
-            try:
-                with sqlite3.connect(db_path) as connection:
-                    connection.execute(
-                        "INSERT INTO pi_inspections VALUES (?,?,?,?,?,?,?,?,?,?,?)",
-                        (
-                            record_id, datetime.now(timezone.utc).isoformat(),
-                            "browser_webcam_capture.png", last["model"], last["conf"],
-                            last["imgsz"], len(last["detections"]),
-                            last["priority"], last["advice"],
-                            json.dumps(last["detections"]), str(output_path)
-                        )
-                    )
-            except Exception:
-                output_path.unlink(missing_ok=True)
-                raise
+            explanation = st.session_state.get("pi_browser_explanation")
+            record_id = save_inspection(
+                db_path, output_dir, filename="browser_webcam_capture.png",
+                model=last["model"], conf=last["conf"], imgsz=last["imgsz"],
+                detections=last["detections"], priority=last["priority"],
+                recommendation=explanation[1] if explanation else last["advice"],
+                annotated_png=last["annotated_png"],
+            )
             st.success(f"Browser webcam inspection {record_id} saved.")
 
     browser_results()
