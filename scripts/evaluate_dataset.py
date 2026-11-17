@@ -138,7 +138,9 @@ def metrics_for_class(predictions, ground_truth_by_image, class_name, threshold=
     fn = total_ground_truth - tp
     precision = tp / (tp + fp) if tp + fp else 0.0
     recall = tp / total_ground_truth if total_ground_truth else None
-    f1 = 2 * precision * recall / (precision + recall) if recall is not None and (precision + recall) else None
+    f1 = (2 * precision * recall / (precision + recall)
+          if recall is not None and (precision + recall) else
+          (0.0 if recall is not None else None))
     return {
         "class": class_name,
         "ground_truth_objects": total_ground_truth,
