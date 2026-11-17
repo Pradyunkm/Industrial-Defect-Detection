@@ -68,6 +68,7 @@ src/
   inference/llama_explain.py  Optional offline Llama explanation helper
 README.md
 requirements.txt
+tests/test_offline_logic.py  Lightweight offline logic tests
 .gitignore
 ```
 
@@ -126,11 +127,23 @@ The command writes an annotated PNG and a JSON report containing detected region
 
 - YOLO NCNN inference on the Raspberry Pi CPU, including annotated images and confidence scores
 - ExecuTorch Llama 3.2 1B text generation on the Raspberry Pi CPU
-- **Separate network-isolated inference tests** for YOLO and Llama
+- **Combined network-isolated YOLO → Llama inference** on the Raspberry Pi CPU using the `scratches_271.jpg` image; three `scratches` regions detected with confidence scores 0.641, 0.568 and 0.432, followed by an ExecuTorch Llama inspection recommendation
+- The combined test reported **1,416 ms YOLO inference** for that one image (not a performance benchmark)
+- Network isolation separately verified under the same `sudo unshare --net -- runuser -u pi` setup: TCP connection to `1.1.1.1:443` failed with `[Errno 101] Network is unreachable`
+- **8/8 lightweight automated tests passing**, covering YOLO review rules and mocked Llama response handling
 - Combined YOLO → Llama explanations inside the Streamlit dashboard
 - SQLite inspection saving, annotated-file persistence, and CSV generation/download
 
 **Still to verify:** the full dashboard workflow under network isolation, systematic evaluation across the six defect classes, and repeatable performance under a stable dedicated power supply. No overall accuracy or real-time camera-performance claim is made here.
+
+### Run the lightweight logic tests
+
+```bash
+cd ~/Industrial_Defect_Detection
+.venv/bin/python -m unittest discover -s tests -v
+```
+
+These tests do not load model weights, access the internet, or require an attached camera.
 
 ## Safety and limitations
 
@@ -142,4 +155,4 @@ The command writes an annotated PNG and a JSON report containing detected region
 
 ## Next work
 
-Expand evaluation results and reproducibility instructions, test full offline integration, and prepare architecture screenshots and a demonstration video for the challenge submission.
+Expand evaluation results and reproducibility instructions, test the **complete dashboard/browser workflow** under network isolation, and prepare architecture screenshots and a demonstration video for the challenge submission.
