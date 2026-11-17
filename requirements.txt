@@ -1,0 +1,17 @@
+# Raspberry Pi 5 YOLO NCNN + Streamlit environment
+# Versions observed in the working Raspberry Pi virtual environment.
+# Python: 3.13 (Raspberry Pi OS / Debian ARM64)
+ultralytics==8.4.211
+streamlit==1.67.0
+numpy==2.5.4
+opencv-python==5.0.0.93
+ncnn==1.0.20261020
+
+# PyTorch is a dependency of Ultralytics. Install a compatible ARM64
+# PyTorch build separately before using this file; the working Pi has
+# torch 2.15.0 (local build reports +cu132). A generic torch pin may
+# install a different, very large or incompatible wheel on ARM64.
+#
+# ExecuTorch 1.5.0 and its Llama .pte model run in a separate installation
+# under ~/executorch-deployment, NOT in this project's virtual environment.
+# Large model files are intentionally excluded from Git.
