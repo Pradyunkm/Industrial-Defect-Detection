@@ -6,6 +6,7 @@ Requires a browser secure context: HTTPS or localhost on the user's laptop.
 import json
 import sqlite3
 import threading
+import numpy as np
 import time
 import uuid
 from datetime import datetime, timezone
@@ -27,7 +28,8 @@ def render_browser_live(model, conf, imgsz, show_annotations, db_path, output_di
     )
     st.caption(
         "Browser webcam support is optional. It does not modify the Windows camera app. "
-        "Detection runs on the Raspberry Pi CPU at a reduced update rate."
+        "Detection runs on the Raspberry Pi CPU at a reduced update rate. "
+        "Stop the browser video player before requesting a Llama explanation of a captured frame."
     )
     try:
         import av
@@ -92,7 +94,7 @@ def render_browser_live(model, conf, imgsz, show_annotations, db_path, output_di
                     snapshot = self._last
                 if self.show_annotations and snapshot:
                     display = cv2.imdecode(
-                        __import__("numpy").frombuffer(snapshot["annotated_png"], dtype="uint8"),
+                        np.frombuffer(snapshot["annotated_png"], dtype=np.uint8),
                         cv2.IMREAD_COLOR,
                     )
                     if display is None:
