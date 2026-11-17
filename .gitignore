@@ -1,0 +1,41 @@
+.venv/
+__pycache__/
+*.pyc
+.env
+datasets/raw/*
+datasets/processed/*
+models/checkpoints/*
+models/exported/*
+logs/*
+*.db
+
+# GitHub publication safeguards
+
+# Large AI model files
+*.pt
+*.pth
+*.pte
+*.onnx
+*.safetensors
+*.gguf
+*.tflite
+
+# Training results and deployment archives
+runs/
+*.zip
+
+# SQLite database files
+*.sqlite
+*.sqlite3
+*.db-wal
+*.db-shm
+*.db-journal
+
+# Private configuration
+.env.*
+!.env.example
+.streamlit/secrets.toml
+
+# Temporary source-code backups
+src/dashboard/app_pi_before_*.py
+src/inference/llama_explain_before_*.py
