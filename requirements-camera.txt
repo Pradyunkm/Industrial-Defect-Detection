@@ -1,0 +1,5 @@
+# Optional Windows/phone browser webcam support, verified installed on Pi:
+# Install only if you want browser-based live video (not needed for USB/CSI/IP sources).
+# Activate ~/Industrial_Defect_Detection/.venv first.
+streamlit-webrtc==0.79.1
+av==19.0.2
