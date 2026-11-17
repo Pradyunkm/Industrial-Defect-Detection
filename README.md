@@ -68,8 +68,15 @@ src/
   inference/common.py       YOLO inference and demo review rules
   inference/infer_image.py  Single-image command-line inference
   inference/llama_explain.py  Optional offline Llama explanation helper
+  inference/inspection_store.py  Shared SQLite, PNG and CSV persistence
+scripts/evaluate_dataset.py  Labeled held-out test-set evaluation
+tests/                     Logic, camera, persistence and evaluation tests
+docs/TECHNICAL_REPORT.md   Report draft with confirmed and pending results
+docs/DEMO_SCRIPT.md        Narrated demonstration recording plan
+docs/SUBMISSION_CHECKLIST.md  Final submission and verification checklist
 README.md
 requirements.txt
+requirements-camera.txt    Optional browser WebRTC dependencies
 tests/test_offline_logic.py  Lightweight offline logic tests
 .gitignore
 ```
@@ -179,6 +186,33 @@ cd ~/Industrial_Defect_Detection
 ```
 
 These tests do not load model weights, access the internet, or require an attached camera.
+
+## Evaluate a held-out labeled test set
+
+To calculate **per-class precision, recall, F1 and AP50**, put actual *held-out* NEU-DET images and their matching Pascal VOC XML or YOLO TXT labels into separate directories. Replace the example paths with your real folder names:
+
+```bash
+cd ~/Industrial_Defect_Detection
+source .venv/bin/activate
+python scripts/evaluate_dataset.py \
+  --images datasets/processed/test/images \
+  --labels datasets/processed/test/labels \
+  --model models/exported/best_ncnn_model \
+  --output logs/evaluation
+```
+
+The evaluator checks that each image has a matching annotation; it refuses to treat missing labels as normal images. Results are saved as `logs/evaluation/metrics.json` and `logs/evaluation/per_class_metrics.csv`. It reports **AP50 only**, not mAP50-95. Six-class mAP50 requires test examples for all six classes.
+
+**Do not report accuracy until the actual test-set evaluation has run**, and avoid lengthy evaluation on laptop USB-C power.
+
+## Final documentation
+
+- [Technical report draft](docs/TECHNICAL_REPORT.md)
+- [Demonstration video script](docs/DEMO_SCRIPT.md)
+- [Submission and browser verification checklist](docs/SUBMISSION_CHECKLIST.md)
+- Optional WebRTC package versions: [requirements-camera.txt](requirements-camera.txt)
+
+Newer versions of the code also save Llama explanation text alongside annotated upload and camera snapshots. Run the updated regression suite and confirm the behavior in the browser before treating these changes as verified.
 
 ## Safety and limitations
 
