@@ -82,6 +82,7 @@ YOLO reports bounding boxes and confidence scores. The app's review outputs are 
 - `src/dashboard/browser_live.py`: optional laptop/phone browser webcam via WebRTC.
 - `src/dashboard/camera_sources.py`: USB, Pi CSI and network camera adapters.
 - `scripts/evaluate_dataset.py`: held-out evaluation from VOC XML or YOLO TXT labels.
+- `scripts/audit_dataset.py`: read-only dataset inventory and explicit split audit.
 - `tests/`: unit, parser and camera-mock tests.
 
 ## 7. Verification evidence already observed
@@ -96,12 +97,12 @@ YOLO reports bounding boxes and confidence scores. The app's review outputs are 
 | YOLO inference in one run | 1,416 ms |
 | YOLO inference in a subsequent run | 3,668 ms |
 | Llama response | Generated a short visual inspection recommendation |
-| SQLite historical inspections | 3 records at last check |
-| Previous comprehensive verification | 16/16 passed when power checks were excluded |
-| Previous camera-source/source tests | 17/17 passed |
-| Browser webcam | User reported live feed functioning; no certified FPS or accuracy measurement |
+| SQLite historical inspections | 4 saved inspections in the latest full check |
+| Latest comprehensive verification | 18/18 passed with power checks deliberately excluded; actual isolated inference and SQLite/CSV workflow verified |
+| Latest confirmed regression suite | 32/32 passed before new dataset-audit tests were added |
+| Browser workflow | User confirmed all 8 manual browser checks passed; no certified FPS or accuracy measurement |
 
-These are **single-test observations, not a benchmark dataset**. The updated persistence and evaluation modules require the newly added regression tests to run on the Pi. A response from the Streamlit health endpoint is not proof that each browser control works.
+These are **single-test observations, not a benchmark dataset**. The newly added read-only dataset audit and extended evaluation guards still require regression tests on the Pi. A response from the Streamlit health endpoint is not proof that each browser control works.
 
 ## 8. Quantitative evaluation plan and missing results
 
@@ -146,7 +147,7 @@ The YOLO inference engine is NCNN on the Raspberry Pi CPU. The Llama model is st
 
 ## 11. Next engineering work
 
-1. Run newly added lightweight regression tests and verify the upload, webcam and history controls manually.
+1. Run the new dataset-audit tests. The prior 32 regression tests and the eight-step manual browser walkthrough passed.
 2. Collect a true held-out annotated test set and run the per-class evaluation script.
 3. Run a short and repeatable performance benchmark on stable power.
 4. Test at least one real Pi-connected USB or CSI camera if available.
