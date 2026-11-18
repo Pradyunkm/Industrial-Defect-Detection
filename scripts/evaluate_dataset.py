@@ -12,6 +12,7 @@ import time
 import xml.etree.ElementTree as ET
 from collections import Counter, defaultdict
 from pathlib import Path
+import hashlib
 
 IMAGE_EXTS = {".jpg", ".jpeg", ".png", ".bmp"}
 EXPECTED_CLASSES = (
@@ -108,7 +109,8 @@ def average_precision(points, total_ground_truth):
     )
 
 
-def metrics_for_class(predictions, ground_truth_by_image, class_name, threshold=0.50):
+def metrics_for_class(predictions, ground_truth_by_image, class_name,
+                      threshold=0.50, operating_conf=0.30):
     total_ground_truth = sum(
         sum(item["class"] == class_name for item in annotations)
         for annotations in ground_truth_by_image.values()
@@ -133,8 +135,14 @@ def metrics_for_class(predictions, ground_truth_by_image, class_name, threshold=
         if matched:
             used[image_id].add(best_index)
         outcomes.append(matched)
-    tp = sum(outcomes)
-    fp = len(outcomes) - tp
+    # AP50 uses the low prediction confidence cutoff; P/R/F1 use the
+    # dashboard's explicit operating confidence threshold, default 0.30.
+    at_operating_conf = [
+        is_tp for prediction, is_tp in zip(candidates, outcomes)
+        if prediction["confidence"] >= operating_conf
+    ]
+    tp = sum(at_operating_conf)
+    fp = len(at_operating_conf) - tp
     fn = total_ground_truth - tp
     precision = tp / (tp + fp) if tp + fp else 0.0
     recall = tp / total_ground_truth if total_ground_truth else None
@@ -144,7 +152,7 @@ def metrics_for_class(predictions, ground_truth_by_image, class_name, threshold=
     return {
         "class": class_name,
         "ground_truth_objects": total_ground_truth,
-        "predicted_objects": len(outcomes),
+        "predicted_objects": len(at_operating_conf),
         "tp": tp, "fp": fp, "fn": fn,
         "precision": round(precision, 5),
         "recall": round(recall, 5) if recall is not None else None,
@@ -169,6 +177,43 @@ def label_path_for(image_path, image_root, label_root):
     )
 
 
+def load_yolo_class_names(data_yaml):
+    """Read dataset.yaml names; do not assume label indices match the model."""
+    import yaml
+    with Path(data_yaml).open("r", encoding="utf-8") as handle:
+        data = yaml.safe_load(handle)
+    if not isinstance(data, dict) or "names" not in data:
+        raise ValueError(f"{data_yaml}: missing dataset 'names' mapping")
+    names = data["names"]
+    if isinstance(names, list):
+        result = {i: canonical(name) for i, name in enumerate(names)}
+    elif isinstance(names, dict):
+        result = {int(index): canonical(name) for index, name in names.items()}
+    else:
+        raise ValueError("Dataset class names must be a list or index dictionary")
+    if not result or any(not name for name in result.values()):
+        raise ValueError("Dataset names must contain nonempty class labels")
+    return result
+
+
+def find_identical_training_images(test_images, train_root):
+    """Detect exact-file overlap; passing does not prove complete independence."""
+    train_root = Path(train_root)
+    if not train_root.is_dir():
+        raise FileNotFoundError(f"Training-image directory missing: {train_root}")
+    def digest(file_path):
+        h = hashlib.sha256()
+        with file_path.open("rb") as handle:
+            for part in iter(lambda: handle.read(1024 * 1024), b""):
+                h.update(part)
+        return h.digest()
+    seen = {
+        digest(p) for p in train_root.rglob("*")
+        if p.is_file() and p.suffix.lower() in IMAGE_EXTS
+    }
+    return [str(p) for p in test_images if digest(p) in seen]
+
+
 def write_csv(path, rows, fieldnames):
     path.parent.mkdir(parents=True, exist_ok=True)
     with path.open("w", newline="", encoding="utf-8") as file:
@@ -188,11 +233,21 @@ def main():
     parser.add_argument("--output", type=Path, default=Path("logs/evaluation"))
     parser.add_argument("--conf", type=float, default=0.001,
                         help="Small confidence cutoff needed for AP50 curves")
+    parser.add_argument("--operating-conf", type=float, default=0.30,
+                        help="Confidence threshold for precision/recall/F1 (dashboard default: 0.30)")
+    parser.add_argument("--data-yaml", type=Path,
+                        help="Required for YOLO TXT labels: original dataset.yaml with class names")
+    parser.add_argument("--train-images", type=Path,
+                        help="Optional original training images for exact-byte overlap detection")
     parser.add_argument("--imgsz", type=int, default=320)
     parser.add_argument("--limit", type=int, default=0,
                         help="Optional small smoke-test subset. 0 = entire test set")
     args = parser.parse_args()
 
+    if not 0 < args.conf <= args.operating_conf <= 1:
+        parser.error("Confidence values must satisfy 0 < --conf <= --operating-conf <= 1")
+    if args.limit < 0:
+        parser.error("--limit cannot be negative")
     if not args.images.is_dir() or not args.labels.is_dir():
         parser.error("Both --images and --labels must be existing folders")
     if not args.model.is_dir():
@@ -211,6 +266,30 @@ def main():
         (image, label_path_for(image, args.images, args.labels))
         for image in images
     ]
+    # YOLO TXT numeric IDs have dataset-specific semantics. Using the
+    # exported model's class order for annotation labels can silently
+    # produce bogus accuracy numbers.
+    has_yolo_labels = any(label.suffix.lower() == ".txt" for _, label in pairs)
+    if has_yolo_labels and not args.data_yaml:
+        parser.error(
+            "YOLO TXT labels require --data-yaml pointing to the ORIGINAL "
+            "dataset.yaml containing the correct class index order"
+        )
+    label_names = load_yolo_class_names(args.data_yaml) if has_yolo_labels else None
+
+    training_overlap = None
+    if args.train_images is not None:
+        training_overlap = find_identical_training_images(images, args.train_images)
+        if training_overlap:
+            raise ValueError(
+                f"{len(training_overlap)} test image(s) exactly duplicate training "
+                f"images; first: {training_overlap[:3]}. Evaluation blocked."
+            )
+        print("No exact-byte duplicate images found against supplied training directory.")
+        print("NOTE: Hash check cannot detect re-encoded or modified training images.")
+    else:
+        print("TRAIN/TEST PROVENANCE UNVERIFIED: no --train-images was supplied.")
+
     print(f"Evaluating {len(pairs)} annotated images (IoU = 0.50)", flush=True)
     print("WARNING: Use a true held-out set not used in YOLO training.", flush=True)
 
@@ -236,7 +315,7 @@ def main():
         height, width = frame.shape[:2]
         annotations = (
             parse_voc(label) if label.suffix.lower() == ".xml"
-            else parse_yolo(label, width, height, class_names)
+            else parse_yolo(label, width, height, label_names)
         )
         unexpected = {item["class"] for item in annotations} - set(class_names.values())
         if unexpected:
@@ -262,7 +341,8 @@ def main():
             print(f"Processed {number}/{len(pairs)} images", flush=True)
 
     rows = [
-        metrics_for_class(predictions, ground_truth, canonical(name))
+        metrics_for_class(predictions, ground_truth, canonical(name),
+                          operating_conf=args.operating_conf)
         for name in EXPECTED_CLASSES
     ]
     populated_aps = [row["ap50"] for row in rows if row["ap50"] is not None]
@@ -271,7 +351,11 @@ def main():
         "evaluated_images": len(pairs),
         "total_ground_truth_objects": sum(row["ground_truth_objects"] for row in rows),
         "model": str(args.model),
-        "confidence_cutoff": args.conf,
+        "confidence_cutoff_for_ap50": args.conf,
+        "operating_confidence_threshold_for_precision_recall_f1": args.operating_conf,
+        "yolo_label_data_yaml": str(args.data_yaml) if args.data_yaml else None,
+        "training_overlap_exact_bytes_checked": args.train_images is not None,
+        "held_out_provenance_independently_verified": False,
         "iou_threshold": 0.50,
         "imgsz": args.imgsz,
         "average_yolo_latency_ms": round(statistics.mean(inference_ms), 1),
