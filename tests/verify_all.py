@@ -3,6 +3,9 @@
 Does not touch live-camera code, install packages, or alter model weights.
 """
 import getpass
+import csv
+import io
+import tempfile
 import importlib.metadata as metadata
 import os
 import socket
@@ -50,13 +53,14 @@ def offline_child():
     from ultralytics import YOLO
     from common import predict, review
     from llama_explain import explain_defects
+    from inspection_store import save_inspection, load_inspections, export_inspections_csv
 
     image = cv2.imread(str(IMAGE))
     if image is None:
         print("FAIL: Cannot open sample image", flush=True)
         return 1
     model = YOLO(str(NCNN), task="detect")
-    _, detections, elapsed = predict(image, model, conf=0.30, imgsz=320)
+    annotated, detections, elapsed = predict(image, model, conf=0.30, imgsz=320)
     print(f"YOLO: {len(detections)} region(s), {elapsed:.0f} ms", flush=True)
     for item in detections:
         print(f"  {item['class']}: {item['confidence']:.3f}", flush=True)
@@ -72,6 +76,46 @@ def offline_child():
         print("FAIL: Empty Llama guidance", flush=True)
         return 1
     print("PASS: YOLO -> Llama worked with no internet", flush=True)
+
+    # Run one complete REAL inference-output workflow in a temporary directory.
+    # No production database or saved inspection is touched.
+    print("\n=== ANNOTATION -> SQLITE -> HISTORY -> CSV ===", flush=True)
+    image_ok, png = cv2.imencode(".png", annotated)
+    if not image_ok:
+        print("FAIL: Could not encode annotated PNG", flush=True)
+        return 1
+
+    with tempfile.TemporaryDirectory(prefix="pi_inspection_check_") as folder:
+        base = Path(folder)
+        inspection_id = save_inspection(
+            base / "inspections.db", base / "annotated",
+            filename=IMAGE.name, model=str(NCNN),
+            conf=0.30, imgsz=320, detections=detections,
+            priority=review(detections)[0],
+            recommendation=report["llama_explanation"],
+            annotated_png=png.tobytes(),
+        )
+        rows = load_inspections(base / "inspections.db")
+        csv_rows = list(csv.DictReader(
+            io.StringIO(export_inspections_csv(rows))
+        ))
+        good = (
+            len(rows) == 1
+            and len(csv_rows) == 1
+            and rows[0]["id"] == inspection_id
+            and rows[0]["detection_count"] == len(detections)
+            and rows[0]["recommendation"] == report["llama_explanation"]
+            and csv_rows[0]["filename"] == IMAGE.name
+            and csv_rows[0]["recommendation"] == report["llama_explanation"]
+            and (base / "annotated" / (inspection_id + ".png")).read_bytes()
+                == png.tobytes()
+        )
+        if not good:
+            print("FAIL: PNG, SQLite, history or CSV mismatch", flush=True)
+            return 1
+
+    print("PASS: Annotated PNG, SQLite, inspection history, CSV export", flush=True)
+    print("PASS: Only temporary test data used; no production records changed", flush=True)
     return 0
 
 
@@ -171,6 +215,30 @@ def main():
     print("\n=== AUTOMATED LOGIC TESTS ===", flush=True)
     unit = run([str(PYTHON), "-m", "unittest", "discover", "-s", "tests", "-v"])
     record("Unit tests", unit.returncode == 0)
+
+    print("\n=== DASHBOARD AND EVALUATION SOURCE CHECK ===", flush=True)
+    from glob import glob
+    sources = []
+    for pattern in ("src/dashboard/*.py", "src/inference/*.py", "scripts/*.py"):
+        sources.extend(glob(str(ROOT / pattern)))
+    valid_source = bool(sources)
+    for filename in sources:
+        try:
+            with open(filename, "rb") as handle:
+                compile(handle.read(), filename, "exec")
+        except (OSError, SyntaxError) as error:
+            print(f"  Error in {filename}: {error}", flush=True)
+            valid_source = False
+    record("Python source compilation", valid_source, f"{len(sources)} project files")
+
+    print("\n=== BROWSER WEBCAM DEPENDENCIES ===", flush=True)
+    try:
+        webrtc_version = metadata.version("streamlit-webrtc")
+        av_version = metadata.version("av")
+        record("WebRTC and PyAV dependencies", True,
+               f"streamlit-webrtc {webrtc_version}, av {av_version}")
+    except metadata.PackageNotFoundError:
+        print("SKIP: WebRTC optional dependencies unavailable; other camera options are unaffected.", flush=True)
 
     print("\n=== FULL OFFLINE YOLO + LLAMA ===", flush=True)
     if safe_power and all(file_status):
