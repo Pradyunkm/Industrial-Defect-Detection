@@ -70,13 +70,11 @@ class DetectionEvaluationTests(unittest.TestCase):
             path = Path(folder) / "data.yaml"
             path.write_text(
                 "names: [scratches, crazing, inclusion, patches, "
-                "pitted_surface, rolled-in_scale]\\n".replace("\\\\n", "\\n"),
+                "pitted_surface, rolled-in_scale]\n",
                 encoding="utf-8",
             )
-            # Label ID 0 means scratches here, regardless of model ID order.
             label = Path(folder) / "one.txt"
-            label.write_text("0 0.5 0.5 0.2 0.2\\n".replace("\\\\n", "\\n"),
-                             encoding="utf-8")
+            label.write_text("0 0.5 0.5 0.2 0.2\n", encoding="utf-8")
             names = load_yolo_class_names(path)
             self.assertEqual(parse_yolo(label, 100, 100, names)[0]["class"],
                              "scratches")
