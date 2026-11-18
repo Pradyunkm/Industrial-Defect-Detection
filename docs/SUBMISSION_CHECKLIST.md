@@ -19,19 +19,20 @@
 - [ ] Pull latest changes: `git pull --ff-only origin main`.
 - [ ] Run lightweight regression suite: `.venv/bin/python -m unittest discover -s tests -v`.
 - [ ] Compile dashboard source: `.venv/bin/python -m py_compile src/dashboard/*.py`.
-- [ ] Open site in Windows browser: `http://localhost:8502` with SSH local tunnel running.
-- [ ] Upload image; see correct original and annotated views.
-- [ ] Toggle sidebar bbox annotations ON/OFF.
-- [ ] Click Explain with Llama; ensure explanation remains visible after interacting.
-- [ ] Save inspection; confirm History row and annotated image.
-- [ ] Export History CSV; confirm latest saved record is present.
-- [ ] Start browser webcam briefly and confirm overlay labels and detections.
-- [ ] Stop browser webcam; download last annotated frame; request Llama guidance and save the captured inspection.
-- [ ] Confirm no Streamlit errors in `logs/streamlit_pi.log`.
+- [x] Open site in Windows browser: `http://localhost:8502` with SSH local tunnel running (user-reported)
+- [x] Upload image; see correct original and annotated views (user-reported)
+- [x] Toggle sidebar bbox annotations ON/OFF (user-reported)
+- [x] Click Explain with Llama; ensure explanation remains visible after interacting (user-reported)
+- [x] Save inspection; confirm History row and annotated image (user-reported)
+- [x] Export History CSV; confirm latest saved record is present (user-reported)
+- [x] Start browser webcam briefly and confirm overlay labels and detections (user-reported)
+- [x] Stop browser webcam; download last annotated frame; request Llama guidance and save the captured inspection (user-reported)
+- [ ] Confirm no unexpected Streamlit errors in `logs/streamlit_pi.log` after extended use.
 - [ ] Optional: test Pi-connected USB webcam / CSI camera / RTSP stream when hardware is available.
 
 ## Quantitative evaluation (not yet performed)
 
+- [ ] Run `python scripts/audit_dataset.py --roots datasets` to locate usable annotations and real split provenance.
 - [ ] Locate actual held-out NEU-DET images AND matching ground-truth XML or TXT labels.
 - [ ] Run `scripts/evaluate_dataset.py` with correct --images and --labels folders.
 - [ ] Inspect generated `logs/evaluation/metrics.json` and per-class CSV.
