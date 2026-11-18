@@ -1,0 +1,4 @@
+# Optional six-class dataset evaluation dependency.
+# Required to read original data.yaml names for YOLO TXT class IDs.
+# Install in the existing Raspberry Pi project venv; no model files change.
+PyYAML>=6.0,<7
