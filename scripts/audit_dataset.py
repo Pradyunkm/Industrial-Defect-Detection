@@ -169,7 +169,8 @@ def audit(root):
         "sample_ambiguous": ambiguous[:5],
         "sample_invalid": bad_labels[:5],
         "dataset_yamls": [
-            str(p.relative_to(root)) for p in root.rglob("*.yaml")
+            str(p.relative_to(root)) for p in root.rglob("*")
+            if p.is_file() and p.suffix.lower() in {".yaml", ".yml"}
         ][:10],
         "warning": (
             "A folder named test does not prove held-out independence. "
