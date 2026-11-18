@@ -70,7 +70,9 @@ src/
   inference/llama_explain.py  Optional offline Llama explanation helper
   inference/inspection_store.py  Shared SQLite, PNG and CSV persistence
 scripts/evaluate_dataset.py  Labeled held-out test-set evaluation
+scripts/audit_dataset.py  Read-only inventory of annotations and split evidence
 tests/                     Logic, camera, persistence and evaluation tests
+docs/DATASET_EVALUATION.md   Six-class labeled-test preparation and provenance guide
 docs/TECHNICAL_REPORT.md   Report draft with confirmed and pending results
 docs/DEMO_SCRIPT.md        Narrated demonstration recording plan
 docs/SUBMISSION_CHECKLIST.md  Final submission and verification checklist
@@ -147,7 +149,7 @@ Keep the SSH tunnel open, and visit `http://localhost:8502` **in the Windows bro
 
 Camera Module drivers and `rpicam-*` tools are **system packages**; consult the [official Raspberry Pi camera software guide](https://www.raspberrypi.com/documentation/accessories/camera-software.html) for compatible installation. On systems where Picamera2 is installed only into the system Python, the app's virtual environment might not import it; the `rpicam-still` fallback can work without modifying the virtual environment.
 
-**Performance/testing:** Continuous YOLO annotation is CPU-limited and updates periodically, not at 30 FPS. The optional browser webcam also throttles inference to reduce load. Use a stable dedicated Pi 5 supply before extended testing. **No USB, CSI, IP or browser live camera hardware has been verified yet in this project; the added paths are experimental.**
+**Performance/testing:** Continuous YOLO annotation is CPU-limited and updates periodically, not at 30 FPS. The optional browser webcam also throttles inference to reduce load. Use a stable dedicated Pi 5 supply before extended testing. **Windows browser WebRTC camera was verified by the user** in a successful manual website walkthrough; Pi-connected USB, CSI and RTSP/HTTP camera hardware remains untested. This is not a measured frame-rate or accuracy benchmark.
 
 The local database is `database/inspections.db`; annotated saved outputs are under `logs/annotated/`. These are runtime artifacts and are not committed.
 
@@ -171,12 +173,13 @@ The command writes an annotated PNG and a JSON report containing detected region
 - **Combined network-isolated YOLO → Llama inference** on the Raspberry Pi CPU using the `scratches_271.jpg` image; three `scratches` regions detected with confidence scores 0.641, 0.568 and 0.432, followed by an ExecuTorch Llama inspection recommendation
 - The combined test reported **1,416 ms YOLO inference** for that one image (not a performance benchmark)
 - Network isolation separately verified under the same `sudo unshare --net -- runuser -u pi` setup: TCP connection to `1.1.1.1:443` failed with `[Errno 101] Network is unreachable`
-- **8/8 lightweight automated tests passing**, covering YOLO review rules and mocked Llama response handling
+- **32/32 automated regression tests** and **18/18 full project checks** passed on the Pi; the latter included real network-isolated YOLO → Llama, annotated PNG, temporary SQLite and CSV verification (before the new dataset-audit tools)
+- **8/8 browser walkthrough checks passed**, including image upload, webcam feed, saving and history, as reported by the user
 - Combined YOLO → Llama explanations inside the Streamlit dashboard
 - SQLite inspection saving, annotated-file persistence, and CSV generation/download
-- Multi-source live-camera UI code added for USB, CSI, IP and optional browser WebRTC; **hardware test pending**
+- Multi-source live-camera UI code added for USB, CSI, IP and optional browser WebRTC; **browser WebRTC manual test passed**, Pi-side hardware testing pending
 
-**Still to verify:** the new multi-source live-camera UI with real USB, CSI, IP or browser camera hardware, the full dashboard workflow under network isolation, systematic evaluation across the six defect classes, and repeatable performance under a stable dedicated power supply. No overall accuracy or real-time camera-performance claim is made here.
+**Still to verify:** real Pi-connected USB/CSI/IP camera hardware, the full dashboard/browser workflow under network isolation, systematic evaluation across all six defect classes, and repeatable performance under stable power. No overall accuracy or real-time frame-rate claim is made here.
 
 ### Run the lightweight logic tests
 
@@ -188,6 +191,12 @@ cd ~/Industrial_Defect_Detection
 These tests do not load model weights, access the internet, or require an attached camera.
 
 ## Evaluate a held-out labeled test set
+
+First run the **read-only dataset inventory** to find real annotation files and explicit split information:
+
+```bash
+python scripts/audit_dataset.py --roots datasets
+```
 
 To calculate **per-class precision, recall, F1 and AP50**, put actual *held-out* NEU-DET images and their matching Pascal VOC XML or YOLO TXT labels into separate directories. Replace the example paths with your real folder names:
 
@@ -201,18 +210,21 @@ python scripts/evaluate_dataset.py \
   --output logs/evaluation
 ```
 
+If labels are **YOLO TXT**, also pass `--data-yaml /path/to/original/data.yaml` to avoid class index mismatches. The evaluator uses dashboard threshold 0.30 for precision/recall/F1 and a lower detection cutoff for AP50. Add `--train-images /path/to/train/images` when available to reject exact-duplicate train/test images; never claim a split is held out solely because it is named `test`.
+
 The evaluator checks that each image has a matching annotation; it refuses to treat missing labels as normal images. Results are saved as `logs/evaluation/metrics.json` and `logs/evaluation/per_class_metrics.csv`. It reports **AP50 only**, not mAP50-95. Six-class mAP50 requires test examples for all six classes.
 
 **Do not report accuracy until the actual test-set evaluation has run**, and avoid lengthy evaluation on laptop USB-C power.
 
 ## Final documentation
 
+- [Six-class labeled dataset preparation and evaluation](docs/DATASET_EVALUATION.md)
 - [Technical report draft](docs/TECHNICAL_REPORT.md)
 - [Demonstration video script](docs/DEMO_SCRIPT.md)
 - [Submission and browser verification checklist](docs/SUBMISSION_CHECKLIST.md)
 - Optional WebRTC package versions: [requirements-camera.txt](requirements-camera.txt)
 
-Newer versions of the code also save Llama explanation text alongside annotated upload and camera snapshots. Run the updated regression suite and confirm the behavior in the browser before treating these changes as verified.
+Newer versions of the code save Llama explanation text alongside annotated upload and camera snapshots. Automated integration and the end-to-end browser workflow have been verified on the Pi; the dataset-audit improvements still require their new regression tests.
 
 ## Safety and limitations
 
