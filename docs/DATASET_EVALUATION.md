@@ -137,3 +137,60 @@ logs/evaluation/per_class_metrics.csv
 - The current verified NCNN model should be evaluated as-is; changing the train split or fine-tuning requires a new explicit benchmark run.
 - The six NEU-DET categories are *defects only*. Even an excellent mAP50 does not justify automated acceptance of defect-free steel.
 - Camera hardware tests, repeatable latency/FPS, and calibrated severity remain separate future-development tasks.
+
+## 6. Final evaluation results — November 23, 2026
+
+The NEU-DET dataset was organized into 1,440 training images,
+180 validation images, and 180 test images.
+
+The final test set contains 180 images and 446 annotated
+defect regions across all six classes.
+
+Training configuration records were inspected, and previous
+file checks found no identical filenames or byte-identical
+images shared between the train/validation and test sets.
+The Pi evaluator nevertheless reported provenance as
+unverified because --train-images was not supplied.
+These checks cannot exclude every possible form of leakage.
+
+### Final Raspberry Pi NCNN test results
+
+Both models were evaluated on the same 180 test images
+at IoU 0.50, with operating confidence 0.30.
+
+| Metric | Original YOLOv8 Nano | Improved 100-epoch model |
+|---|---:|---:|
+| Test mAP50 | 74.32% | 74.66% |
+| True positives | 268 | 286 |
+| False positives | 73 | 67 |
+| False negatives | 178 | 160 |
+| Micro F1 | 68.11% | 71.59% |
+| Average prediction latency | 76.5 ms | 92.2 ms |
+
+### Per-class test AP50
+
+| Class | Original | Improved |
+|---|---:|---:|
+| Crazing | 44.61% | 46.03% |
+| Inclusion | 79.55% | 81.50% |
+| Patches | 92.16% | 92.78% |
+| Pitted surface | 73.11% | 81.61% |
+| Rolled-in scale | 67.78% | 64.02% |
+| Scratches | 88.71% | 82.00% |
+
+At confidence 0.30, the improved model detected 17 of
+79 annotated crazing regions, giving 21.52% crazing recall.
+This remains a major limitation.
+
+The improved model is deployed at 320x320 pixels. The
+original NCNN model is preserved as a rollback backup.
+
+These figures come from the project's Raspberry Pi AP50
+evaluator. They are not industrial certification results,
+and the measured prediction latency is not live-camera FPS.
+
+Final results file:
+logs/evaluation/improved_model_test_final/
+
+The test set should not be reused for further
+hyperparameter selection or threshold tuning.

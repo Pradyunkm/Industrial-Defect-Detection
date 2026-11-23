@@ -4,7 +4,7 @@
 
 ## Completed (supported by observed outputs)
 
-- [x] YOLOv8 Nano exported to NCNN and running on Raspberry Pi 5.
+- [x] Improved 100-epoch YOLO NCNN model deployed on Raspberry Pi 5; original Nano model backed up.
 - [x] ExecuTorch Llama 3.2 1B runner working on Pi.
 - [x] Combined YOLO → Llama test succeeded with network access blocked.
 - [x] SQLite inspection history contained three records during prior test.
@@ -17,7 +17,7 @@
 ## Implementation completed in code; verify again on Pi
 
 - [ ] Pull latest changes: `git pull --ff-only origin main`.
-- [ ] Run lightweight regression suite: `.venv/bin/python -m unittest discover -s tests -v`.
+- [x] Run lightweight regression suite: `.venv/bin/python -m unittest discover -s tests -v`.
 - [ ] Compile dashboard source: `.venv/bin/python -m py_compile src/dashboard/*.py`.
 - [x] Open site in Windows browser: `http://localhost:8502` with SSH local tunnel running (user-reported)
 - [x] Upload image; see correct original and annotated views (user-reported)
@@ -30,13 +30,13 @@
 - [ ] Confirm no unexpected Streamlit errors in `logs/streamlit_pi.log` after extended use.
 - [ ] Optional: test Pi-connected USB webcam / CSI camera / RTSP stream when hardware is available.
 
-## Quantitative evaluation (not yet performed)
+## Quantitative evaluation (completed; follow-up work remains)
 
 - [ ] Run `python scripts/audit_dataset.py --roots datasets` to locate usable annotations and real split provenance.
 - [ ] Locate actual held-out NEU-DET images AND matching ground-truth XML or TXT labels.
-- [ ] Run `scripts/evaluate_dataset.py` with correct --images and --labels folders.
+- [x] Run `scripts/evaluate_dataset.py` with correct --images and --labels folders.
 - [ ] Inspect generated `logs/evaluation/metrics.json` and per-class CSV.
-- [ ] Verify the test set contains all six classes before claiming six-class mAP50.
+- [x] Verify the test set contains all six classes before claiming six-class mAP50.
 - [ ] Generate mAP50–95 separately if required; the provided evaluator reports AP50 only.
 - [ ] Record latency distribution, CPU/RAM and temperature under stable power.
 - [ ] Add evaluation numbers and caveats to the technical report and README.
@@ -79,3 +79,44 @@ python scripts/evaluate_dataset.py \
   --labels datasets/processed/test/labels \
   --limit 10
 ```
+
+## Final verified results — November 23, 2026
+
+| Check | Verified result |
+|---|---|
+| Hardware | Raspberry Pi 5 |
+| Active detector | Improved 100-epoch YOLO NCNN, 320x320 |
+| Test images | 180 |
+| Ground-truth defect regions | 446 |
+| Final test mAP50 | 74.66% |
+| True positives | 286 |
+| False positives | 67 |
+| False negatives | 160 |
+| Micro F1 at confidence 0.30 | 71.59% |
+| Average Pi prediction latency | 92.2 ms |
+| Unit tests | 42/42 passed |
+| SQLite integrity | OK |
+| Saved inspection records | 5 during verification |
+| Streamlit image upload and detection | Verified |
+| Offline inspection guidance | Displayed |
+| SQLite inspection saving and history | Verified |
+| Original model backup | Verified by SHA256 |
+
+### Remaining submission work
+
+- [ ] Review final technical report.
+- [ ] Export final technical report as PDF.
+- [ ] Capture final dashboard screenshots.
+- [ ] Record demonstration video.
+- [ ] Verify official submission requirements and deadline.
+- [ ] Commit and push updated documentation to GitHub.
+- [ ] Submit the required project deliverables.
+
+### Known limitations
+
+- Crazing test recall is 21.52% at confidence 0.30.
+- The improved model is slower than the original Nano model.
+- Live industrial camera performance remains unverified.
+- The evaluator's optional training-provenance check was not run.
+- Python unit tests emit nonfatal SQLite ResourceWarnings.
+- No industrial certification or automated acceptance is claimed.

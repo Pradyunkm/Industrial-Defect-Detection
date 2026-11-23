@@ -1,13 +1,13 @@
 # Technical report — Industrial Defect Detection & Quality-Control Assistant
 
 **Bharat AI-SoC Challenge 2026–27 | PS5 — Manufacturing & Industry 4.0**  
-**Status:** Phase 1 technical-report draft; update evaluation tables and screenshots before submission.  
+**Status:** Updated with November 23, 2026 model evaluation and integration results; final submission review pending.
 **Repository:** https://github.com/Pradyunkm/Industrial-Defect-Detection  
 **Target:** Raspberry Pi 5 (8 GB RAM), ARM64, CPU-only
 
 ## 1. Executive summary
 
-This prototype performs edge-based visual inspection of steel surfaces using YOLOv8 Nano exported to NCNN on Raspberry Pi 5. It identifies possible surface defect regions, overlays detection boxes, and provides advisory review categories. The operator can optionally request a short, on-device explanation from Llama 3.2 1B Instruct running through ExecuTorch. The Streamlit dashboard supports uploaded images, browser-camera snapshots, experimental live feeds from multiple camera types, annotated-image downloads, SQLite inspection history, and CSV export.
+This prototype performs edge-based visual inspection of steel surfaces using an improved 100-epoch YOLO detector exported to NCNN at 320 pixels on Raspberry Pi 5. It identifies possible surface defect regions, overlays detection boxes, and provides advisory review categories. The operator can optionally request a short, on-device explanation from Llama 3.2 1B Instruct running through ExecuTorch. The Streamlit dashboard supports uploaded images, browser-camera snapshots, experimental live feeds from multiple camera types, annotated-image downloads, SQLite inspection history, and CSV export.
 
 All inference is designed to run locally without a cloud API. A combined YOLO → Llama inference test was successfully conducted inside a network namespace that could not reach external IP addresses. The project is a research prototype; no measurement, acceptance decision, calibrated severity or industrial certification is claimed.
 
@@ -16,7 +16,7 @@ All inference is designed to run locally without a cloud API. A combined YOLO �
 Manual steel-surface inspection may be inconsistent, time-consuming and difficult to document. PS5 asks for on-device visual defect and anomaly detection, operator assistance, logging and real-time edge operation. The project focuses on small-device, offline processing and audit-friendly inspection records.
 
 **Implemented:** six-class detector, optional Llama advice, basic human-review prompts, timestamped inspection history and annotated evidence.  
-**Not yet established:** true production-rate throughput, verified defect severity labels, accuracy on fully held-out annotated data, or industrial false-positive/false-negative rates.
+**Not yet established:** production-rate camera throughput, calibrated defect severity, and accuracy on independent industrial production data.
 
 ## 3. Hardware and software
 
@@ -24,7 +24,7 @@ Manual steel-surface inspection may be inconsistent, time-consuming and difficul
 |---|---|
 | Compute | Raspberry Pi 5, 8 GB, ARM64 CPU |
 | Operating environment | Debian/Raspberry Pi Linux, Python 3.13 virtual environment |
-| Detector | Ultralytics YOLOv8 Nano, NCNN export |
+| Detector | 100-epoch YOLO, 11.13M parameters, NCNN 320px; original YOLOv8 Nano retained as backup |
 | Inspection dataset | NEU-DET steel surface defect classes |
 | Advisory model | Llama 3.2 1B Instruct .pte |
 | LLM runtime | ExecuTorch 1.5.0, ARM64 native build |
@@ -43,7 +43,7 @@ Uploaded image / browser webcam / Pi-side USB / CSI / IP camera
                           |
                    OpenCV BGR frame
                           |
-               YOLOv8 Nano -> NCNN CPU
+               100-epoch YOLO -> NCNN CPU
                           |
               Boxes, class, confidence
                      /         \
@@ -85,51 +85,82 @@ YOLO reports bounding boxes and confidence scores. The app's review outputs are 
 - `scripts/audit_dataset.py`: read-only dataset inventory and explicit split audit.
 - `tests/`: unit, parser and camera-mock tests.
 
-## 7. Verification evidence already observed
+## 7. Verification evidence
 
-| Verification | Recorded outcome |
+| Verification | Confirmed result |
 |---|---|
-| Combined isolated YOLO → Llama | Completed successfully |
-| Network egress in isolated namespace | Blocked; `[Errno 101] Network is unreachable` |
-| Example image | `scratches_271.jpg` |
-| Detections on example | 3 boxes, all classified as scratches |
-| Confidence scores | 0.641, 0.568, 0.432 |
-| YOLO inference in one run | 1,416 ms |
-| YOLO inference in a subsequent run | 3,668 ms |
-| Llama response | Generated a short visual inspection recommendation |
-| SQLite historical inspections | 4 saved inspections in the latest full check |
-| Latest comprehensive verification | 18/18 passed with power checks deliberately excluded; actual isolated inference and SQLite/CSV workflow verified |
-| Latest confirmed regression suite | 32/32 passed before new dataset-audit tests were added |
-| Browser workflow | User confirmed all 8 manual browser checks passed; no certified FPS or accuracy measurement |
+| Platform | Raspberry Pi 5, CPU-only NCNN inference |
+| Deployed detector | Improved 100-epoch YOLO, exported at 320x320 |
+| Original detector | Preserved in a separate backup |
+| Automated tests | 42/42 passed |
+| SQLite integrity | OK; 5 inspection records during verification |
+| Dashboard | Image upload, detection overlay, and inspection guidance displayed |
+| Inspection persistence | Save to SQLite and inspection history demonstrated |
+| Offline Llama | Earlier network-isolated YOLO-to-Llama workflow passed; guidance also displayed after deployment |
+| Known warning | Python ResourceWarning for unclosed SQLite connections during unit tests |
 
-These are **single-test observations, not a benchmark dataset**. The newly added read-only dataset audit and extended evaluation guards still require regression tests on the Pi. A response from the Streamlit health endpoint is not proof that each browser control works.
+The improved model was successfully loaded from
+`models/exported/best_ncnn_model` and tested through the
+Streamlit dashboard. The dashboard was accessed through an
+SSH tunnel from Windows.
 
-## 8. Quantitative evaluation plan and missing results
+## 8. Quantitative model evaluation
 
-Use an annotated **held-out** subset of NEU-DET not used in training. The script accepts Pascal VOC XML or YOLO TXT bounding-box annotations, matches detections to ground truth at IoU >= 0.50 and generates per-class precision, recall, F1 and AP50, plus mAP50 over the classes actually represented.
+The NEU-DET dataset uses six defect classes. The original
+training dataset contains 1440 training, 180 validation,
+and 180 test images. The test set has 446 annotated defect
+regions. Earlier checks found no identical filenames or
+byte-identical images shared between training/validation
+and test splits.
 
-```bash
-cd ~/Industrial_Defect_Detection
-source .venv/bin/activate
-python scripts/evaluate_dataset.py \
-  --images datasets/processed/test/images \
-  --labels datasets/processed/test/labels \
-  --model models/exported/best_ncnn_model \
-  --output logs/evaluation
-```
+The original training configuration and split were checked,
+but the Pi evaluator printed a provenance warning because
+the optional --train-images argument was not provided.
+These checks do not exclude all possible dataset leakage.
 
-**Dataset folder names are examples:** inspect the available Pi test-set layout before executing. The script rejects images missing annotation files rather than silently treating them as defect-free. It does not calculate mAP50–95. The results in `logs/evaluation/metrics.json` and `per_class_metrics.csv` must be generated from actual annotated test data.
+### Final Raspberry Pi test-set comparison
 
-| Metric | Status |
-|---|---|
-| Six-class precision / recall / F1 | Awaiting evaluation run |
-| Per-class AP50 | Awaiting evaluation run |
-| mAP50, all six classes | Awaiting adequate held-out representation |
-| mAP50–95 | Not measured by this script |
-| End-to-end webcam FPS | Not measured |
-| Peak RAM / CPU and sustained load | Not measured |
+Both NCNN models were evaluated on the same 180 annotated
+test images at IoU 0.50 and operating confidence 0.30.
 
-Do not add a guessed accuracy number to the submission.
+| Metric | Original YOLOv8 Nano | Improved 100-epoch YOLO |
+|---|---:|---:|
+| mAP50 | 74.32% | 74.66% |
+| True positives | 268 | 286 |
+| False positives | 73 | 67 |
+| False negatives | 178 | 160 |
+| Micro F1 at confidence 0.30 | 68.11% | 71.59% |
+| Average Pi prediction latency | 76.5 ms | 92.2 ms |
+
+Latency was measured over 12 sequential predictions per
+model. It is not an end-to-end live-camera FPS measurement.
+
+### Final per-class AP50
+
+| Defect | Original | Improved |
+|---|---:|---:|
+| Crazing | 44.61% | 46.03% |
+| Inclusion | 79.55% | 81.50% |
+| Patches | 92.16% | 92.78% |
+| Pitted surface | 73.11% | 81.61% |
+| Rolled-in scale | 67.78% | 64.02% |
+| Scratches | 88.71% | 82.00% |
+
+The improved model gives better overall detection F1 at
+the selected operating threshold but is slower. It also
+performs worse in AP50 for rolled-in scale and scratches.
+
+Crazing recall on the final test set is only 21.52% at
+confidence 0.30. This is a significant limitation and
+requires human quality-control review.
+
+The Pi evaluation script reports AP50/mAP50 only. A separate
+matched Windows validation run measured mAP50-95 at 45.41%
+for the improved PyTorch model at 320 pixels; this is not
+a final test-set mAP50-95 score.
+
+The six-class defect-only dataset does not establish
+reliable acceptance of normal, defect-free materials.
 
 ## 9. Edge deployment and offline verification
 
@@ -145,20 +176,21 @@ The YOLO inference engine is NCNN on the Raspberry Pi CPU. The Llama model is st
 - Llama outputs require human review; safety text filtering is limited.
 - Tests on monitor-displayed sample images are not a substitute for a real industrial camera evaluation.
 
-## 11. Next engineering work
+## 11. Remaining engineering work
 
-1. Run the new dataset-audit tests. The prior 32 regression tests and the eight-step manual browser walkthrough passed.
-2. Collect a true held-out annotated test set and run the per-class evaluation script.
-3. Run a short and repeatable performance benchmark on stable power.
-4. Test at least one real Pi-connected USB or CSI camera if available.
-5. Capture proof screenshots and a narrated demonstration video.
-6. Export this draft as a PDF with real evaluation results and submit with the public repository.
+1. Capture demonstration screenshots and video.
+2. Verify the final submission requirements and deadline.
+3. Document model provenance and installation instructions.
+4. Measure sustained camera FPS and memory use if hardware is available.
+5. Investigate SQLite connection-cleanup warnings.
+6. Improve crazing recall in future model experiments without tuning
+   on the final test set.
 
 ## 12. Project deliverables
 
 - **Source code:** public GitHub repository linked above.
 - **Application:** on-device Streamlit dashboard served by Raspberry Pi.
 - **Demonstration video:** to be recorded; see `docs/DEMO_SCRIPT.md`.
-- **Technical report:** this draft; replace unmeasured fields and export to PDF for submission.
+- **Technical report:** updated with measured results; complete final review and export to PDF for submission.
 
 **Reference:** [Official Bharat AI-SoC Challenge PS5 specification](https://armbharatchallenge.com/) — required Llama/ExecuTorch technologies and four deliverables.
