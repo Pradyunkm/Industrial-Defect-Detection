@@ -6,6 +6,55 @@ An **offline-capable steel-surface inspection research prototype** running on a 
 
 > **Research prototype, not a certified quality-control system.** Detection confidence is not defect severity; no detections do not prove a defect-free surface. Human verification is required.
 
+## Latest deployment update — 25 November 2026
+
+**Steel Inspector** is now deployed as a standalone Raspberry Pi 5 research prototype. A connected display runs the local Chromium kiosk; the dashboard is managed by `steel-inspector.service` and the learning worker by `steel-learning.timer`. Windows and cloud compute are not required during normal local operation. Online technical search is optional.
+
+### Latest feature source and repository status
+
+The original, successfully installed upgrade scripts are archived here, including their embedded Python modules, integration patches and relevant service configuration:
+
+| Upgrade | Source | Scope |
+|---|---|---|
+| Automatic learning | [install_steel_auto_learning.sh](scripts/upgrades/install_steel_auto_learning.sh) | CPU fine-tuning, dataset versioning, champion/challenger evaluation, NCNN deployment, version registry and rollback |
+| Operator tools | [steel_operator_addons.sh](scripts/upgrades/steel_operator_addons.sh) | Batch inspection, alerts, multilingual QC guidance, shutdown and recovery |
+| Final feature update | [steel_inspector_final_upgrade.sh](scripts/upgrades/steel_inspector_final_upgrade.sh) | Health monitoring, analytics, PDF reports, experimental texture screening, QC assistant, optional online evidence retrieval, offline voice, translated common controls and camera sample review |
+
+**Source snapshot limitation:** These are exact upgrade installer copies, not a synchronized snapshot of the Pi's complete uncommitted working tree. The older tracked application below remains the repository baseline. The installers are incremental and expect the earlier Pi-local QC, dashboard, feedback, CPU environment and systemd setup already in place; they are not a fresh-clone bootstrap. Do not rerun them on a working installation merely to access the dashboard.
+
+### Running the configured appliance
+
+On the provisioned Pi, the dashboard starts automatically at boot. Open `http://127.0.0.1:8501` locally. For maintenance:
+
+```bash
+systemctl is-active steel-inspector.service
+curl -fsS http://127.0.0.1:8501/_stcore/health
+systemctl list-timers steel-learning.timer --all --no-pager
+cat ~/soc-retraining/training_status.json
+```
+
+If necessary, restart the existing service with `sudo systemctl restart steel-inspector.service`. Do not launch a second Streamlit instance on the same port. Optional remote viewing uses an SSH tunnel, not remote inference.
+
+### Latest observed results
+
+| Metric or observation | Result |
+|---|---|
+| Held-out detector mAP50 | 74.66% |
+| Micro F1 at confidence 0.30 | 71.59% |
+| CPU-only Python environment | Approximately 1.8 GB, down from 6.4 GB |
+| SpinQuant INT4 Llama artifact | Approximately 1,083 MiB, down from 2,357 MiB |
+| Local training dataset | 1,439 images; 180 validation and 180 test images preserved |
+| Existing regression tests | 46/46 passed on 25 November |
+| Dashboard health endpoint | `ok` |
+| Automatic learning | Configured; waiting for 50 newly approved samples (0 at last recorded check) |
+| Hardware snapshot | 57.6 °C, 7.2 GiB available RAM, 31 GB free storage |
+
+The detector benchmark is the earlier held-out evaluation, not a new post-upgrade accuracy measurement. Automatic model promotion and rollback have not yet been exercised end-to-end. The new YOLOv8s seed is a pretrained starting checkpoint, not the recovered weights of the active NCNN model. The training worker must reject unsuitable candidates and preserve the current detector. Texture screening is experimental, multilingual coverage is partial, and all QC decisions require human review. The recorded historical undervoltage/throttling flags (`0x50000`) require attention before sustained training.
+
+The following sections retain the earlier baseline setup, evaluation methodology and deployment history for reference.
+
+---
+
 ## System architecture
 
 ```text
